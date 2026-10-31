@@ -1,0 +1,980 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>سباق الأشياء</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts: Cairo -->
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&display=swap" rel="stylesheet">
+    
+    <style>
+        * {
+            font-family: 'Cairo', sans-serif;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #38bdf8;
+        }
+        #game-canvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 1;
+        }
+        .ui-layer {
+            position: relative;
+            z-index: 10;
+            pointer-events: none;
+        }
+        .interactive {
+            pointer-events: auto;
+        }
+        .btn-3d {
+            transition: all 0.15s ease;
+            box-shadow: 0 6px 0 rgba(0,0,0,0.2), 0 8px 15px rgba(0,0,0,0.15);
+            transform: translateY(0);
+        }
+        .btn-3d:active {
+            transform: translateY(4px);
+            box-shadow: 0 2px 0 rgba(0,0,0,0.2), 0 4px 8px rgba(0,0,0,0.15);
+        }
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.92);
+            backdrop-filter: blur(12px);
+            border: 3px solid rgba(255, 255, 255, 0.9);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+        }
+    </style>
+</head>
+<body class="text-slate-800">
+
+    <!-- 2D Canvas -->
+    <canvas id="game-canvas"></canvas>
+
+    <!-- Welcome Modal -->
+    <div id="welcome-modal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/80 backdrop-blur-md p-4">
+        <div class="glass-panel rounded-3xl max-w-lg w-full p-6 md:p-8 text-center border-4 border-amber-400 shadow-2xl">
+            <div class="w-20 h-20 mx-auto mb-4 bg-gradient-to-tr from-amber-400 to-orange-500 rounded-full flex items-center justify-center shadow-lg text-4xl animate-bounce">
+                🛞
+            </div>
+            <h1 class="text-2xl md:text-3xl font-black text-indigo-900 mb-3">سباق الأشياء</h1>
+            <p class="text-base text-slate-700 font-bold mb-6">
+                لنكتشف كيف تساعد العجلات الأشياء على الحركه
+            </p>
+            <button onclick="startGame()" class="btn-3d interactive w-full py-4 bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-600 hover:to-green-700 text-white font-black text-xl rounded-2xl">
+                🚀 ابدأ اللعب الآن
+            </button>
+        </div>
+    </div>
+
+    <!-- Certificate Modal -->
+    <div id="certificate-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-900/80 backdrop-blur-md p-4">
+        <div class="glass-panel rounded-3xl max-w-xl w-full p-6 md:p-8 text-center border-4 border-yellow-400 shadow-2xl">
+            <div class="text-6xl mb-3 animate-bounce">🏆</div>
+            <h2 class="text-2xl md:text-3xl font-black text-amber-600 mb-2">أحسنت يا بطل!</h2>
+            <p class="text-slate-700 font-bold mb-4">لقد أتممت جميع سباقات العجلات بنجاح وتوصلت للاستنتاج العلمي:</p>
+            
+            <div class="bg-gradient-to-r from-amber-50 to-yellow-100 border-2 border-amber-400 rounded-2xl p-4 mb-5 text-right space-y-2 shadow-inner">
+                <div class="flex items-start gap-2">
+                    <span class="text-xl">✅</span>
+                    <p class="font-extrabold text-indigo-950 text-sm md:text-base">العجلات تجعل الأشياء تتحرك أسرع وأسهل وبمجهود أقل.</p>
+                </div>
+            </div>
+
+            <button onclick="closeCertificate()" class="btn-3d interactive px-8 py-3 bg-gradient-to-r from-indigo-600 to-blue-600 text-white font-black rounded-2xl text-lg">
+                🔄 إعادة السباق من جديد
+            </button>
+        </div>
+    </div>
+
+    <!-- Top Navigation Header -->
+    <div class="ui-layer fixed top-3 left-0 right-0 p-3">
+        <div class="max-w-md mx-auto flex items-center justify-between glass-panel rounded-full px-5 py-2 border-2 border-amber-300">
+            <button onclick="playSound('success')" class="w-10 h-10 bg-amber-400 rounded-full flex items-center justify-center text-xl shadow-md interactive hover:scale-105 transition">
+                🔊
+            </button>
+            
+            <!-- Stage Bubbles -->
+            <div class="flex items-center gap-3">
+                <button onclick="switchStage(3)" id="bubble-3" class="w-10 h-10 rounded-full font-black text-sm transition-all bg-slate-200 text-slate-600 interactive flex items-center justify-center shadow-inner">٣</button>
+                <span class="text-slate-400 font-bold">-</span>
+                <button onclick="switchStage(2)" id="bubble-2" class="w-10 h-10 rounded-full font-black text-sm transition-all bg-slate-200 text-slate-600 interactive flex items-center justify-center shadow-inner">٢</button>
+                <span class="text-slate-400 font-bold">-</span>
+                <button onclick="switchStage(1)" id="bubble-1" class="w-10 h-10 rounded-full font-black text-sm transition-all bg-emerald-500 text-white interactive flex items-center justify-center shadow-lg scale-110">١</button>
+                <span class="font-extrabold text-slate-800 text-sm mr-1">:المراحل</span>
+            </div>
+
+            <div class="w-10 h-10 bg-indigo-500 rounded-full flex items-center justify-center text-white text-lg shadow-md interactive cursor-pointer hover:scale-105 transition" onclick="switchStage(1)">
+                🏠
+            </div>
+        </div>
+
+        <!-- Stage Item Name Banner (Purple Area) -->
+        <div class="mt-3 flex justify-center">
+            <div id="stage-item-title" class="glass-panel px-6 py-2 rounded-2xl border-2 border-indigo-400 text-indigo-950 font-black text-lg md:text-xl shadow-md">
+                📦 الصندوق الخشبي
+            </div>
+        </div>
+    </div>
+
+    <!-- Bottom Controls Panel -->
+    <div class="ui-layer fixed bottom-4 left-0 right-0 p-3">
+        <div class="max-w-xl mx-auto w-full flex flex-col gap-2 items-center">
+
+            <!-- STAGE 1: Box -->
+            <div id="controls-stage-1" class="glass-panel interactive rounded-3xl p-3.5 w-full flex flex-col items-center justify-center text-center gap-2 border-2 border-emerald-400">
+                <button onclick="startRace(1)" id="btn-race-1" class="btn-3d w-64 py-3 bg-gradient-to-r from-emerald-500 to-green-600 text-white font-black rounded-2xl text-base flex items-center justify-center gap-2 mx-auto">
+                    <span>🏁</span>
+                    <span>ابدأ السباق</span>
+                </button>
+                <div id="post-race-1" class="hidden items-center justify-center gap-2 w-full">
+                    <button onclick="startRace(1)" id="btn-retry-1" class="btn-3d px-4 py-3 bg-amber-500 text-white font-bold rounded-2xl text-sm">
+                        🔄 إعادة
+                    </button>
+                    <button onclick="switchStage(2)" id="btn-next-1" class="btn-3d px-6 py-3 bg-gradient-to-r from-indigo-600 to-blue-600 text-white font-black rounded-2xl text-sm flex items-center justify-center gap-2">
+                        <span>التالي: عربة التسوق 🛒</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- STAGE 2: Shopping Cart -->
+            <div id="controls-stage-2" class="glass-panel interactive rounded-3xl p-3.5 w-full hidden flex-col items-center justify-center text-center gap-2 border-2 border-amber-400">
+                <button onclick="startRace(2)" id="btn-race-2" class="btn-3d w-64 py-3 bg-gradient-to-r from-emerald-500 to-green-600 text-white font-black rounded-2xl text-base flex items-center justify-center gap-2 mx-auto">
+                    <span>🏁</span>
+                    <span>ابدأ السباق</span>
+                </button>
+                <div class="flex items-center justify-center gap-2 w-full">
+                    <button onclick="switchStage(1)" class="btn-3d px-4 py-2.5 bg-slate-600 text-white font-bold rounded-2xl text-xs">السابق</button>
+                    <button onclick="startRace(2)" id="btn-retry-2" class="btn-3d px-4 py-2.5 bg-amber-500 text-white font-bold rounded-2xl text-xs hidden">🔄 إعادة</button>
+                    <button onclick="switchStage(3)" id="btn-next-2" class="btn-3d px-6 py-2.5 bg-gradient-to-r from-indigo-600 to-blue-600 text-white font-black rounded-2xl text-sm hidden flex items-center justify-center gap-2">
+                        <span>التالي: الحقيبة المدرسية 🎒</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- STAGE 3: School Backpack -->
+            <div id="controls-stage-3" class="glass-panel interactive rounded-3xl p-3.5 w-full hidden flex-col items-center justify-center text-center gap-2 border-2 border-pink-400">
+                <button onclick="startRace(3)" id="btn-race-3" class="btn-3d w-64 py-3 bg-gradient-to-r from-emerald-500 to-green-600 text-white font-black rounded-2xl text-base flex items-center justify-center gap-2 mx-auto">
+                    <span>🏁</span>
+                    <span>ابدأ السباق</span>
+                </button>
+                <div class="flex items-center justify-center gap-2 w-full">
+                    <button onclick="switchStage(2)" class="btn-3d px-4 py-2.5 bg-slate-600 text-white font-bold rounded-2xl text-xs">السابق</button>
+                    <button onclick="startRace(3)" id="btn-retry-3" class="btn-3d px-4 py-2.5 bg-amber-500 text-white font-bold rounded-2xl text-xs hidden">🔄 إعادة</button>
+                    <button onclick="showCertificate()" id="btn-next-3" class="btn-3d px-6 py-2.5 bg-gradient-to-r from-amber-500 to-orange-600 text-white font-black rounded-2xl text-sm hidden flex items-center justify-center gap-2">
+                        <span>💡 الاستنتاج</span>
+                    </button>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        /********************************************************************
+         * 1. SOUND SYNTHESIS (Web Audio API)
+         ********************************************************************/
+        let audioCtx = null;
+        function initAudio() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+        }
+
+        function playSound(type) {
+            try {
+                initAudio();
+                if (audioCtx.state === 'suspended') audioCtx.resume();
+                const now = audioCtx.currentTime;
+
+                if (type === 'success') {
+                    const freqs = [523.25, 659.25, 783.99, 1046.5];
+                    freqs.forEach((f, idx) => {
+                        const osc = audioCtx.createOscillator();
+                        const gain = audioCtx.createGain();
+                        osc.type = 'triangle';
+                        osc.frequency.setValueAtTime(f, now + idx * 0.08);
+                        gain.gain.setValueAtTime(0.15, now + idx * 0.08);
+                        gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.08 + 0.25);
+                        osc.connect(gain);
+                        gain.connect(audioCtx.destination);
+                        osc.start(now + idx * 0.08);
+                        osc.stop(now + idx * 0.08 + 0.25);
+                    });
+                } else if (type === 'whistle') {
+                    const osc = audioCtx.createOscillator();
+                    const gain = audioCtx.createGain();
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(750, now);
+                    osc.frequency.linearRampToValueAtTime(1250, now + 0.18);
+                    gain.gain.setValueAtTime(0.2, now);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
+                    osc.connect(gain);
+                    gain.connect(audioCtx.destination);
+                    osc.start(now);
+                    osc.stop(now + 0.35);
+                } else if (type === 'step') {
+                    const osc = audioCtx.createOscillator();
+                    const gain = audioCtx.createGain();
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(160, now);
+                    osc.frequency.exponentialRampToValueAtTime(60, now + 0.06);
+                    gain.gain.setValueAtTime(0.05, now);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.06);
+                    osc.connect(gain);
+                    gain.connect(audioCtx.destination);
+                    osc.start(now);
+                    osc.stop(now + 0.06);
+                }
+            } catch (e) {}
+        }
+
+        /********************************************************************
+         * 2. 2D CANVAS & ANIMATION STATE
+         ********************************************************************/
+        const canvas = document.getElementById('game-canvas');
+        const ctx = canvas.getContext('2d');
+
+        let currentStage = 1;
+        let isRacing = false;
+        let raceFinished = false;
+        let globalTime = 0;
+
+        // Racers progress from 0.0 (start) to 1.0 (finish)
+        let topRacer = {
+            progress: 0,
+            wheelAngle: 0,
+            walkCycle: 0,
+            finished: false
+        };
+
+        let bottomRacer = {
+            progress: 0,
+            walkCycle: 0,
+            finished: false
+        };
+
+        // Animated Background Elements
+        const clouds = [
+            { x: 0.1, y: 0.08, scale: 0.9, speed: 0.00015 },
+            { x: 0.45, y: 0.12, scale: 1.2, speed: 0.0001 },
+            { x: 0.8, y: 0.07, scale: 0.8, speed: 0.0002 }
+        ];
+
+        const particles = []; // Dust, sweat, sparkles
+
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        function startGame() {
+            initAudio();
+            playSound('success');
+            document.getElementById('welcome-modal').classList.add('hidden');
+        }
+
+        function resetPositions() {
+            isRacing = false;
+            raceFinished = false;
+            topRacer.progress = 0;
+            topRacer.wheelAngle = 0;
+            topRacer.walkCycle = 0;
+            topRacer.finished = false;
+
+            bottomRacer.progress = 0;
+            bottomRacer.walkCycle = 0;
+            bottomRacer.finished = false;
+            particles.length = 0;
+        }
+
+        function startRace(stage) {
+            playSound('whistle');
+            resetPositions();
+            isRacing = true;
+
+            document.getElementById(`btn-race-${stage}`).classList.add('hidden');
+            if (stage === 1) {
+                const pr1 = document.getElementById('post-race-1');
+                pr1.classList.add('hidden');
+                pr1.classList.remove('flex');
+            } else {
+                document.getElementById(`btn-retry-${stage}`).classList.add('hidden');
+                document.getElementById(`btn-next-${stage}`).classList.add('hidden');
+            }
+        }
+
+        function switchStage(stage) {
+            currentStage = stage;
+            playSound('success');
+            resetPositions();
+
+            const stageNames = {
+                1: '📦 الصندوق الخشبي',
+                2: '🛒 عربة التسوق',
+                3: '🎒 الحقيبة المدرسية'
+            };
+            const titleEl = document.getElementById('stage-item-title');
+            if (titleEl) titleEl.textContent = stageNames[stage];
+
+            [1, 2, 3].forEach(s => {
+                const el = document.getElementById(`controls-stage-${s}`);
+                if (s === stage) {
+                    el.classList.remove('hidden');
+                    el.classList.add('flex');
+                } else {
+                    el.classList.add('hidden');
+                    el.classList.remove('flex');
+                }
+            });
+
+            // Reset buttons visibility for selected stage
+            document.getElementById(`btn-race-${stage}`).classList.remove('hidden');
+            if (stage === 1) {
+                const pr1 = document.getElementById('post-race-1');
+                pr1.classList.add('hidden');
+                pr1.classList.remove('flex');
+            } else {
+                document.getElementById(`btn-retry-${stage}`).classList.add('hidden');
+                document.getElementById(`btn-next-${stage}`).classList.add('hidden');
+            }
+
+            for (let i = 1; i <= 3; i++) {
+                const b = document.getElementById(`bubble-${i}`);
+                if (i === stage) {
+                    b.className = "w-10 h-10 rounded-full font-black text-sm transition-all bg-emerald-500 text-white interactive flex items-center justify-center shadow-lg scale-110";
+                } else {
+                    b.className = "w-10 h-10 rounded-full font-black text-sm transition-all bg-slate-200 text-slate-600 interactive flex items-center justify-center shadow-inner";
+                }
+            }
+        }
+
+        function showCertificate() {
+            playSound('success');
+            const modal = document.getElementById('certificate-modal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
+        function closeCertificate() {
+            const modal = document.getElementById('certificate-modal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+            switchStage(1);
+        }
+
+        /********************************************************************
+         * 3. PARTICLE EFFECTS (Dust, Sweat, Sparkles)
+         ********************************************************************/
+        function spawnParticle(x, y, type) {
+            if (type === 'dust') {
+                particles.push({
+                    x, y,
+                    vx: -1.5 - Math.random() * 1.5,
+                    vy: -0.5 - Math.random() * 1.2,
+                    radius: 4 + Math.random() * 6,
+                    alpha: 0.7,
+                    color: '#d6d3d1',
+                    type: 'dust'
+                });
+            } else if (type === 'sweat') {
+                particles.push({
+                    x: x + (Math.random() - 0.5) * 20,
+                    y: y - 75,
+                    vx: -1 - Math.random() * 1.5,
+                    vy: -2 - Math.random() * 1.5,
+                    radius: 3.5,
+                    alpha: 0.9,
+                    color: '#38bdf8',
+                    type: 'sweat'
+                });
+            } else if (type === 'sparkle') {
+                const colors = ['#facc15', '#34d399', '#60a5fa', '#f472b6'];
+                particles.push({
+                    x, y: y - 20 - Math.random() * 40,
+                    vx: -2 - Math.random() * 2,
+                    vy: (Math.random() - 0.5) * 2,
+                    radius: 4 + Math.random() * 3,
+                    alpha: 1,
+                    color: colors[Math.floor(Math.random() * colors.length)],
+                    type: 'sparkle'
+                });
+            }
+        }
+
+        function updateAndDrawParticles() {
+            for (let i = particles.length - 1; i >= 0; i--) {
+                const p = particles[i];
+                p.x += p.vx;
+                p.y += p.vy;
+
+                if (p.type === 'sweat') {
+                    p.vy += 0.18;
+                    p.alpha -= 0.025;
+                } else if (p.type === 'dust') {
+                    p.radius += 0.25;
+                    p.alpha -= 0.022;
+                } else {
+                    p.alpha -= 0.025;
+                }
+
+                if (p.alpha <= 0) {
+                    particles.splice(i, 1);
+                    continue;
+                }
+
+                ctx.save();
+                ctx.globalAlpha = Math.max(0, p.alpha);
+                ctx.fillStyle = p.color;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+            }
+        }
+
+        /********************************************************************
+         * 4. 2D DRAWING FUNCTIONS (Environment, Characters, Items)
+         ********************************************************************/
+        function drawEnvironment(w, h, trackTopY, trackBottomY, startX, finishX) {
+            // 1. Sky Gradient
+            const skyGrad = ctx.createLinearGradient(0, 0, 0, h * 0.35);
+            skyGrad.addColorStop(0, '#38bdf8');
+            skyGrad.addColorStop(1, '#bae6fd');
+            ctx.fillStyle = skyGrad;
+            ctx.fillRect(0, 0, w, h * 0.35);
+
+            // 2. Animated Smiling Sun
+            const sunX = w * 0.12;
+            const sunY = h * 0.12;
+            ctx.save();
+            ctx.translate(sunX, sunY);
+            ctx.rotate(globalTime * 0.005);
+            ctx.fillStyle = '#fde047';
+            for (let i = 0; i < 12; i++) {
+                ctx.rotate(Math.PI / 6);
+                ctx.beginPath();
+                ctx.moveTo(32, -6);
+                ctx.lineTo(48, 0);
+                ctx.lineTo(32, 6);
+                ctx.fill();
+            }
+            ctx.restore();
+
+            ctx.fillStyle = '#facc15';
+            ctx.beginPath();
+            ctx.arc(sunX, sunY, 30, 0, Math.PI * 2);
+            ctx.fill();
+
+            // 3. Moving Clouds
+            clouds.forEach(c => {
+                c.x += c.speed;
+                if (c.x > 1.15) c.x = -0.15;
+                const cx = c.x * w;
+                const cy = c.y * h;
+                ctx.save();
+                ctx.translate(cx, cy);
+                ctx.scale(c.scale, c.scale);
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+                ctx.beginPath();
+                ctx.arc(0, 0, 22, 0, Math.PI * 2);
+                ctx.arc(20, -6, 26, 0, Math.PI * 2);
+                ctx.arc(44, 0, 20, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+            });
+
+            // 4. Rolling Green Park Hills
+            ctx.fillStyle = '#4ade80';
+            ctx.beginPath();
+            ctx.moveTo(0, h * 0.32);
+            ctx.quadraticCurveTo(w * 0.25, h * 0.24, w * 0.5, h * 0.31);
+            ctx.quadraticCurveTo(w * 0.75, h * 0.36, w, h * 0.28);
+            ctx.lineTo(w, h);
+            ctx.lineTo(0, h);
+            ctx.fill();
+
+            // Background Garden Ground
+            ctx.fillStyle = '#22c55e';
+            ctx.fillRect(0, h * 0.33, w, h * 0.67);
+
+            // 5. Swaying Trees along the top of the track
+            const treeCount = 6;
+            for (let i = 0; i < treeCount; i++) {
+                const tx = (w / (treeCount)) * i + (w * 0.08);
+                const ty = h * 0.33;
+                const sway = Math.sin(globalTime * 0.04 + i) * 4;
+
+                // Trunk
+                ctx.fillStyle = '#78350f';
+                ctx.fillRect(tx - 7, ty - 38, 14, 40);
+
+                // Foliage
+                ctx.fillStyle = '#15803d';
+                ctx.beginPath();
+                ctx.arc(tx + sway, ty - 52, 26, 0, Math.PI * 2);
+                ctx.arc(tx - 16 + sway * 0.8, ty - 40, 20, 0, Math.PI * 2);
+                ctx.arc(tx + 16 + sway * 0.8, ty - 40, 20, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            // 6. Two Racing Lanes (Top = With Wheels, Bottom = Without Wheels)
+            const laneHeight = Math.min(115, h * 0.22);
+
+            function drawLane(centerY, borderColor) {
+                const top = centerY - laneHeight / 2;
+
+                // Curb Borders
+                ctx.fillStyle = borderColor;
+                ctx.fillRect(0, top - 6, w, laneHeight + 12);
+
+                // Asphalt Track
+                ctx.fillStyle = '#334155';
+                ctx.fillRect(0, top, w, laneHeight);
+
+                // Dashed Center Line
+                ctx.strokeStyle = 'rgba(255,255,255,0.35)';
+                ctx.lineWidth = 3;
+                ctx.setLineDash([20, 15]);
+                ctx.beginPath();
+                ctx.moveTo(0, centerY);
+                ctx.lineTo(w, centerY);
+                ctx.stroke();
+                ctx.setLineDash([]);
+            }
+
+            drawLane(trackTopY, '#a7f3d0');
+            drawLane(trackBottomY, '#fecaca');
+
+            // 7. Start & Finish Lines
+            function drawCheckerLine(x, label) {
+                const top = trackTopY - laneHeight / 2;
+                const bottom = trackBottomY + laneHeight / 2;
+                const sqSize = 12;
+
+                for (let y = top; y < bottom; y += sqSize) {
+                    const isEven = Math.floor((y - top) / sqSize) % 2 === 0;
+                    ctx.fillStyle = isEven ? '#ffffff' : '#0f172a';
+                    ctx.fillRect(x, y, sqSize, Math.min(sqSize, bottom - y));
+                    ctx.fillStyle = isEven ? '#0f172a' : '#ffffff';
+                    ctx.fillRect(x + sqSize, y, sqSize, Math.min(sqSize, bottom - y));
+                }
+
+                // Banner Flag on top of line
+                ctx.fillStyle = '#f59e0b';
+                ctx.beginPath();
+                ctx.roundRect(x - 28, top - 34, 80, 26, 8);
+                ctx.fill();
+                ctx.fillStyle = '#ffffff';
+                ctx.font = 'bold 13px Cairo';
+                ctx.textAlign = 'center';
+                ctx.fillText(label, x + 12, top - 16);
+            }
+
+            drawCheckerLine(startX, 'البداية');
+            drawCheckerLine(finishX, 'النهاية 🏁');
+
+            // 8. Draw Lane Label Badges AFTER Checker Lines so they are never covered
+            function drawLaneBadge(centerY, title, badgeColor) {
+                const top = centerY - laneHeight / 2;
+                const badgeW = 132;
+                const badgeX = w - badgeW - 6;
+                ctx.save();
+                ctx.fillStyle = badgeColor;
+                ctx.strokeStyle = '#ffffff';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.roundRect(badgeX, top + 8, badgeW, 30, 15);
+                ctx.fill();
+                ctx.stroke();
+                ctx.fillStyle = '#ffffff';
+                ctx.font = 'bold 13px Cairo';
+                ctx.textAlign = 'center';
+                ctx.fillText(title, badgeX + badgeW / 2, top + 28);
+                ctx.restore();
+            }
+
+            drawLaneBadge(trackTopY, '🛞 مسار بعجلات', '#10b981');
+            drawLaneBadge(trackBottomY, '🛑 مسار بدون عجلات', '#ef4444');
+        }
+
+        // Draw Animated Spinning 2D Wheel
+        function drawWheel2D(x, y, radius, angle, rimColor = '#facc15') {
+            ctx.save();
+            ctx.translate(x, y);
+            ctx.rotate(angle);
+
+            // Outer Tire
+            ctx.fillStyle = '#1e293b';
+            ctx.beginPath();
+            ctx.arc(0, 0, radius, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Rim
+            ctx.fillStyle = rimColor;
+            ctx.beginPath();
+            ctx.arc(0, 0, radius * 0.58, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Spokes to clearly show rotation!
+            ctx.strokeStyle = '#1e293b';
+            ctx.lineWidth = 2.5;
+            for (let i = 0; i < 4; i++) {
+                ctx.rotate(Math.PI / 4);
+                ctx.beginPath();
+                ctx.moveTo(-radius * 0.55, 0);
+                ctx.lineTo(radius * 0.55, 0);
+                ctx.stroke();
+            }
+
+            // Center Hub
+            ctx.fillStyle = '#ffffff';
+            ctx.beginPath();
+            ctx.arc(0, 0, radius * 0.2, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.restore();
+        }
+
+        // Draw Animated 2D Character pushing from left to right
+        function drawCharacter2D(x, groundY, shirtColor, walkCycle, isStruggling, isMoving) {
+            ctx.save();
+            ctx.translate(x, groundY);
+
+            const leanAngle = isStruggling ? 0.35 : 0.12;
+            const bounceY = isMoving ? Math.abs(Math.sin(walkCycle)) * 5 : 0;
+
+            // Shadow under character
+            ctx.fillStyle = 'rgba(0,0,0,0.22)';
+            ctx.beginPath();
+            ctx.ellipse(0, 0, 18, 5, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Animated Legs
+            const legSwing = isMoving ? Math.sin(walkCycle) * 14 : 0;
+
+            ctx.lineCap = 'round';
+            ctx.lineWidth = 9;
+
+            // Back Leg
+            ctx.strokeStyle = '#1e3a8a';
+            ctx.beginPath();
+            ctx.moveTo(-3, -26 + bounceY);
+            ctx.lineTo(-3 - legSwing, -4);
+            ctx.stroke();
+
+            // Front Leg
+            ctx.strokeStyle = '#1d4ed8';
+            ctx.beginPath();
+            ctx.moveTo(3, -26 + bounceY);
+            ctx.lineTo(3 + legSwing, -4);
+            ctx.stroke();
+
+            // Body & Head Group (Leaning Forward)
+            ctx.translate(0, -26 + bounceY);
+            ctx.rotate(leanAngle);
+
+            // Torso
+            ctx.fillStyle = shirtColor;
+            ctx.beginPath();
+            ctx.roundRect(-11, -32, 22, 32, 8);
+            ctx.fill();
+
+            // Head
+            ctx.fillStyle = '#fed7aa';
+            ctx.beginPath();
+            ctx.arc(0, -45, 13, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Hair / Cap
+            ctx.fillStyle = shirtColor;
+            ctx.beginPath();
+            ctx.arc(0, -47, 13.5, Math.PI, Math.PI * 2);
+            ctx.fill();
+            // Cap Visor pointing right
+            ctx.beginPath();
+            ctx.roundRect(2, -50, 16, 5, 3);
+            ctx.fill();
+
+            // Eye & Facial Expression
+            ctx.fillStyle = '#0f172a';
+            if (isStruggling && isMoving) {
+                // Strained closed eye (>)
+                ctx.lineWidth = 2.2;
+                ctx.strokeStyle = '#0f172a';
+                ctx.beginPath();
+                ctx.moveTo(4, -48);
+                ctx.lineTo(9, -45);
+                ctx.lineTo(4, -42);
+                ctx.stroke();
+            } else {
+                // Happy Eye
+                ctx.beginPath();
+                ctx.arc(6, -45, 2.2, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            // Arms Reaching Forward to Push Object
+            ctx.strokeStyle = shirtColor;
+            ctx.lineWidth = 7;
+            ctx.beginPath();
+            ctx.moveTo(4, -22);
+            ctx.lineTo(26, -16);
+            ctx.stroke();
+
+            // Hands
+            ctx.fillStyle = '#fed7aa';
+            ctx.beginPath();
+            ctx.arc(27, -16, 4.5, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.restore();
+        }
+
+        // Draw Stage Object (1: Wooden Box, 2: Shopping Cart, 3: School Backpack)
+        function drawStageItem2D(stage, x, groundY, withWheels, wheelAngle, isMoving) {
+            ctx.save();
+            // Small vibration if scraping without wheels
+            const shakeY = (!withWheels && isMoving) ? Math.sin(globalTime * 0.8) * 1.5 : 0;
+            const wheelLift = withWheels ? 16 : 0;
+            ctx.translate(x, groundY - wheelLift + shakeY);
+
+            // Ground Shadow
+            ctx.fillStyle = 'rgba(0,0,0,0.25)';
+            ctx.beginPath();
+            ctx.ellipse(38, wheelLift, 42, 6, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            if (stage === 1) {
+                // STAGE 1: Wooden Crate
+                ctx.fillStyle = '#d97706';
+                ctx.strokeStyle = '#92400e';
+                ctx.lineWidth = 3;
+                ctx.beginPath();
+                ctx.roundRect(0, -56, 74, 56, 6);
+                ctx.fill();
+                ctx.stroke();
+
+                // Wooden Planks Detail
+                ctx.fillStyle = '#b45309';
+                ctx.fillRect(4, -42, 66, 6);
+                ctx.fillRect(4, -20, 66, 6);
+
+                // Diagonal Brace
+                ctx.strokeStyle = '#fde68a';
+                ctx.lineWidth = 4;
+                ctx.beginPath();
+                ctx.moveTo(8, -50);
+                ctx.lineTo(66, -6);
+                ctx.stroke();
+
+                if (withWheels) {
+                    drawWheel2D(16, 4, 13, wheelAngle, '#facc15');
+                    drawWheel2D(58, 4, 13, wheelAngle, '#facc15');
+                }
+            } else if (stage === 2) {
+                // STAGE 2: Shopping Cart with Water Bottles
+                // Handlebar on Left
+                ctx.strokeStyle = '#ef4444';
+                ctx.lineWidth = 5;
+                ctx.beginPath();
+                ctx.moveTo(-10, -58);
+                ctx.lineTo(4, -45);
+                ctx.stroke();
+
+                // Water Bottles Inside
+                ctx.fillStyle = '#38bdf8';
+                ctx.fillRect(14, -48, 16, 32);
+                ctx.fillRect(34, -48, 16, 32);
+                ctx.fillRect(54, -48, 16, 32);
+                // Bottle Caps
+                ctx.fillStyle = '#16a34a';
+                ctx.fillRect(18, -53, 8, 5);
+                ctx.fillRect(38, -53, 8, 5);
+                ctx.fillRect(58, -53, 8, 5);
+
+                // Wire Basket Frame
+                ctx.strokeStyle = '#e2e8f0';
+                ctx.lineWidth = 3.5;
+                ctx.beginPath();
+                ctx.roundRect(4, -50, 74, 38, 6);
+                ctx.stroke();
+
+                // Grid lines
+                ctx.lineWidth = 2;
+                for (let gx = 20; gx < 74; gx += 16) {
+                    ctx.beginPath();
+                    ctx.moveTo(gx, -50);
+                    ctx.lineTo(gx, -12);
+                    ctx.stroke();
+                }
+
+                // Bottom Metal Base
+                ctx.fillStyle = '#94a3b8';
+                ctx.fillRect(4, -8, 74, 6);
+
+                if (withWheels) {
+                    drawWheel2D(16, 4, 12, wheelAngle, '#38bdf8');
+                    drawWheel2D(64, 4, 12, wheelAngle, '#38bdf8');
+                }
+            } else if (stage === 3) {
+                // STAGE 3: School Backpack
+                // Top Handle
+                ctx.strokeStyle = '#1e293b';
+                ctx.lineWidth = 4;
+                ctx.beginPath();
+                ctx.arc(32, -64, 10, Math.PI, 0);
+                ctx.stroke();
+
+                // Main Bag Body
+                ctx.fillStyle = '#ec4899';
+                ctx.strokeStyle = '#be185d';
+                ctx.lineWidth = 3;
+                ctx.beginPath();
+                ctx.roundRect(6, -62, 54, 60, 14);
+                ctx.fill();
+                ctx.stroke();
+
+                // Front Pocket
+                ctx.fillStyle = '#f43f5e';
+                ctx.beginPath();
+                ctx.roundRect(42, -40, 22, 32, 8);
+                ctx.fill();
+                ctx.stroke();
+
+                // Decorative Star
+                ctx.fillStyle = '#fde047';
+                ctx.beginPath();
+                ctx.arc(26, -42, 7, 0, Math.PI * 2);
+                ctx.fill();
+
+                if (withWheels) {
+                    drawWheel2D(18, 4, 12, wheelAngle, '#38bdf8');
+                    drawWheel2D(50, 4, 12, wheelAngle, '#38bdf8');
+                }
+            }
+
+            ctx.restore();
+        }
+
+        /********************************************************************
+         * 5. MAIN GAME LOOP
+         ********************************************************************/
+        function animate() {
+            requestAnimationFrame(animate);
+            globalTime++;
+
+            const w = canvas.width;
+            const h = canvas.height;
+
+            // Calculate Responsive Track Coordinates
+            const trackTopY = h * 0.50;
+            const trackBottomY = h * 0.74;
+            const startX = Math.max(45, w * 0.07);
+            const finishX = w - Math.max(175, w * 0.18);
+            const trackDistance = finishX - startX;
+
+            // Update Physics & Progress during Race
+            if (isRacing) {
+                // Top Racer (With Wheels - Smooth & Fast)
+                if (!topRacer.finished) {
+                    topRacer.progress += 0.0085;
+                    topRacer.wheelAngle += 0.22;
+                    topRacer.walkCycle += 0.28;
+
+                    if (globalTime % 4 === 0) {
+                        const curX = startX + topRacer.progress * trackDistance;
+                        spawnParticle(curX, trackTopY + 25, 'sparkle');
+                    }
+
+                    if (topRacer.progress >= 1) {
+                        topRacer.progress = 1;
+                        topRacer.finished = true;
+                        playSound('success');
+                    }
+                }
+
+                // Bottom Racer (Without Wheels - Slow & High Friction)
+                if (!bottomRacer.finished) {
+                    bottomRacer.progress += 0.0024;
+                    bottomRacer.walkCycle += 0.15;
+
+                    const curX = startX + bottomRacer.progress * trackDistance;
+                    if (globalTime % 5 === 0) {
+                        spawnParticle(curX + 20, trackBottomY + 28, 'dust');
+                    }
+                    if (globalTime % 12 === 0) {
+                        spawnParticle(curX - 24, trackBottomY + 20, 'sweat');
+                    }
+
+                    if (bottomRacer.progress >= 1) {
+                        bottomRacer.progress = 1;
+                        bottomRacer.finished = true;
+                    }
+                }
+
+                // Step sound effect
+                if (globalTime % 14 === 0 && (!topRacer.finished || !bottomRacer.finished)) {
+                    playSound('step');
+                }
+
+                // Check Race Completion
+                if (topRacer.finished && bottomRacer.progress > 0.38 && !raceFinished) {
+                    raceFinished = true;
+                    if (currentStage === 1) {
+                        const pr1 = document.getElementById('post-race-1');
+                        pr1.classList.remove('hidden');
+                        pr1.classList.add('flex');
+                    } else {
+                        document.getElementById(`btn-retry-${currentStage}`).classList.remove('hidden');
+                        document.getElementById(`btn-next-${currentStage}`).classList.remove('hidden');
+                    }
+                }
+
+                if (topRacer.finished && bottomRacer.finished) {
+                    isRacing = false;
+                }
+            }
+
+            // Clear & Draw 2D World
+            ctx.clearRect(0, 0, w, h);
+            drawEnvironment(w, h, trackTopY, trackBottomY, startX, finishX);
+
+            // Compute Current X Positions
+            const topX = startX + topRacer.progress * trackDistance;
+            const bottomX = startX + bottomRacer.progress * trackDistance;
+
+            // Draw Top Racer (With Wheels)
+            const topMoving = isRacing && !topRacer.finished;
+            drawCharacter2D(topX - 24, trackTopY + 28, '#10b981', topRacer.walkCycle, false, topMoving);
+            drawStageItem2D(currentStage, topX, trackTopY + 28, true, topRacer.wheelAngle, topMoving);
+
+            // Draw Bottom Racer (Without Wheels)
+            const bottomMoving = isRacing && !bottomRacer.finished;
+            drawCharacter2D(bottomX - 24, trackBottomY + 28, '#ef4444', bottomRacer.walkCycle, true, bottomMoving);
+            drawStageItem2D(currentStage, bottomX, trackBottomY + 28, false, 0, bottomMoving);
+
+            // Draw Particles (Dust, Sweat, Sparkles)
+            updateAndDrawParticles();
+        }
+
+        window.onload = function () {
+            switchStage(1);
+            animate();
+        };
+    </script>
+</body>
+</html>
